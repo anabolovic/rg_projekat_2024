@@ -28,6 +28,25 @@ void processInput(GLFWwindow *window);
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
+glm::vec3 spotLightAmbient = glm::vec3(0.0f);
+glm::vec3 spotLightDiffuse = glm::vec3(5.f, 3.f, 6.f);
+glm::vec3 spotLightSpecular = glm::vec3(6.0f, 3.f, 7.f);
+
+/*rg::SpotLight spotLight{
+        glm::vec3(0.0f),
+        glm::vec3(0.0f),
+        spotLightAmbient,
+        spotLightDiffuse,
+        spotLightSpecular,
+        glm::cos(glm::radians(12.5f)),
+        glm::cos(glm::radians(15.0f)),
+        1.0f,
+        0.02f,
+        0.005f
+};*/
+
+
+
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -69,6 +88,10 @@ struct ProgramState {
     void LoadFromFile(std::string filename);
 };
 
+glm::vec3 sunPosition{0.0f};
+glm::vec3 earthPosition{};
+
+float earthSpeed = 0.1f;
 void ProgramState::SaveToFile(std::string filename) {
     std::ofstream out(filename);
     out << clearColor.r << '\n'
@@ -149,6 +172,9 @@ int main() {
     if (programState->ImGuiEnabled) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
+
+
+
     // Init Imgui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -164,6 +190,10 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
+    // Enable blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     // build and compile shaders
     // -------------------------
     Shader asteroidShader("resources/shaders/asteroid.vs", "resources/shaders/asteroid.fs");
@@ -176,8 +206,9 @@ int main() {
 
     // load models
     // -----------
-    Model ourModel("resources/objects/sun/Sun.obj");
-    ourModel.SetShaderTextureNamePrefix("material.");
+    Model earth("resources/objects/earth/scene.gltf", true);
+    Model sunModel("resources/objects/sun/Sun.obj");
+    // ourModel.SetShaderTextureNamePrefix("material.");
 
     PointLight& pointLight = programState->pointLight;
     pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
@@ -190,7 +221,7 @@ int main() {
     pointLight.quadratic = 0.032f;
 
     // draw in wireframe
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     float vertices[] = {
             -0.5f, -0.5f, 0.0f,
@@ -227,41 +258,49 @@ int main() {
 
         // render
         // ------
-        glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // don't forget to enable shader before setting uniforms
-        sunShader.use();
+
 
         pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
-        sunShader.setVec3("pointLight.position", pointLight.position);
-        sunShader.setVec3("pointLight.ambient", pointLight.ambient);
-        sunShader.setVec3("pointLight.diffuse", pointLight.diffuse);
-        sunShader.setVec3("pointLight.specular", pointLight.specular);
-        sunShader.setFloat("pointLight.constant", pointLight.constant);
-        sunShader.setFloat("pointLight.linear", pointLight.linear);
-        sunShader.setFloat("pointLight.quadratic", pointLight.quadratic);
-        sunShader.setVec3("viewPosition", programState->camera.Position);
-        sunShader.setFloat("material.shininess", 32.0f);
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
+
+        planetShader.use();
+        /*planetShader.setLight("pointLight", pointLight);
+        planetShader.setLight("spotLight", spotLight);
+        planetShader.setVec3("viewPos", camera.position);*/
+        planetShader.setMat4("projection", projection);
+        planetShader.setMat4("view", view);
+
+
+        sunShader.use();
         sunShader.setMat4("projection", projection);
         sunShader.setMat4("view", view);
 
-        // render the loaded model
+        earthPosition = sunPosition + glm::vec3(20.0f * sin(glfwGetTime() * earthSpeed), 0.0f,
+                                                    20.0f * cos(glfwGetTime() * earthSpeed));
+
+        // render sun
+        sunShader.use();
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model,
-                               programState->backpackPosition); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(programState->backpackScale));    // it's a bit too big for our scene, so scale it down
+        model = glm::mat4(1.0f);    // it's a bit too big for our scene, so scale it down
         sunShader.setMat4("model", model);
-        ourModel.Draw(sunShader);
+        sunModel.Draw(sunShader);
+
+        planetShader.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, earthPosition);
+        model = glm::scale(model, glm::vec3(1.5f));
+        planetShader.setMat4("model", model);
+        earth.Draw(planetShader);
 
         if (programState->ImGuiEnabled)
             DrawImGui(programState);
-
-
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
