@@ -158,10 +158,13 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // build and compile shaders
     // -------------------------
     Shader ourShader("resources/shaders/sun.vs", "resources/shaders/sun.fs");
+    Shader blendingShader("resources/shaders/blending.vs", "resources/shaders/blending.fs");
 
     // load models
     // -----------
@@ -182,6 +185,10 @@ int main() {
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Konfiguracija blending-a pre glavne petlje renderovanja
+    blendingShader.use();
+    blendingShader.setInt("texture1", 0.5);
 
     // render loop
     // -----------
@@ -221,12 +228,17 @@ int main() {
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
+        blendingShader.use();
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
+
+        blendingShader.setMat4("projection", projection);
+        blendingShader.setMat4("view", view);
+
         model = glm::translate(model,
                                programState->suncobranPosition); // translate it down so it's at the center of the scene
         model = glm::scale(model, glm::vec3(programState->suncobranScale));    // it's a bit too big for our scene, so scale it down
-        ourShader.setMat4("model", model);
+        blendingShader.setMat4("model", model);
         ourModel.Draw(ourShader);
 
         if (programState->ImGuiEnabled)
