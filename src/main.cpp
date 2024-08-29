@@ -62,7 +62,7 @@ struct ProgramState {
     Camera camera;
     bool CameraMouseMovementUpdateEnabled = true;
     glm::vec3 suncobranPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-    float suncobranScale = 12.0f;
+    float suncobranScale = 10.0f;
     PointLight pointLight;
     ProgramState()
             : camera(glm::vec3(.0f, 0.0f, 1.5f)) {}
@@ -244,11 +244,11 @@ int main() {
     vector<std::string> skyboxSides
             {
                     FileSystem::getPath("resources/textures/cubemaps/space/back.jpg"),
-                    FileSystem::getPath("resources/textures/cubemaps/space/down.jng"),
-                    FileSystem::getPath("resources/textures/cubemaps/space/front.jng"),
-                    FileSystem::getPath("resources/textures/cubemaps/space/left.jng"),
-                    FileSystem::getPath("resources/textures/cubemaps/space/right.jng"),
-                    FileSystem::getPath("resources/textures/cubemaps/space/up.jng")
+                    FileSystem::getPath("resources/textures/cubemaps/space/down.jpg"),
+                    FileSystem::getPath("resources/textures/cubemaps/space/front.jpg"),
+                    FileSystem::getPath("resources/textures/cubemaps/space/left.jpg"),
+                    FileSystem::getPath("resources/textures/cubemaps/space/right.jpg"),
+                    FileSystem::getPath("resources/textures/cubemaps/space/up.jpg")
             };
     unsigned int cubemapTexture = loadCubemap(skyboxSides);
 
@@ -318,10 +318,12 @@ int main() {
         glClearColor(programState->clearColor.r, programState->clearColor.g, programState->clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
         // Configure projection matrix for skybox
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
                                                 (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = glm::mat4(glm::mat3(programState->camera.GetViewMatrix())); // Remove translation from the view matrix
+
 
 
         glDepthFunc(GL_LEQUAL); // Change depth function so depth test passes when values are equal to depth buffer's content
@@ -335,22 +337,21 @@ int main() {
         glBindVertexArray(0);
         glDepthFunc(GL_LESS);
 
+
         // don't forget to enable shader before setting uniforms
         ourShader.use();
         pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
-        ourShader.setVec3("pointLight.position", pointLight.position);
         ourShader.setVec3("pointLight.ambient", pointLight.ambient);
         ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
         ourShader.setVec3("pointLight.specular", pointLight.specular);
+        ourShader.setVec3("pointLight.position", pointLight.position);
         ourShader.setFloat("pointLight.constant", pointLight.constant);
         ourShader.setFloat("pointLight.linear", pointLight.linear);
         ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
         ourShader.setVec3("viewPosition", programState->camera.Position);
-        ourShader.setFloat("material.shininess", 32.0f);
-        // view/projection transformations
-        view = programState->camera.GetViewMatrix();
-        ourShader.setMat4("projection", projection);
-        ourShader.setMat4("view", view);
+        ourShader.setVec3("lightPos", pointLight.position);
+        ourShader.setFloat("material.shininess", 64.0f);
+
 
         blendingShader.use();
         // render the loaded model
@@ -358,18 +359,25 @@ int main() {
 
         blendingShader.setMat4("projection", projection);
         blendingShader.setMat4("view", view);
+        ourShader.setMat4("projection", projection);
+        ourShader.setMat4("view", view);
 
-        model = glm::translate(model,
-                               programState->suncobranPosition); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(programState->suncobranScale));    // it's a bit too big for our scene, so scale it down
+
+        model = glm::translate(model,programState->suncobranPosition);
+
+        model = glm::scale(model, glm::vec3(programState->suncobranScale));
+
         blendingShader.setMat4("model", model);
+
         ourModel.Draw(ourShader);
+        GLenum error = glGetError();
+        if(error != GL_NO_ERROR)
+            std::cout << "Greska draw:" << error << std::endl;
 
 
 
         if (programState->ImGuiEnabled)
             DrawImGui(programState);
-
 
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
